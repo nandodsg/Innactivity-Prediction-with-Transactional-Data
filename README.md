@@ -13,6 +13,7 @@ This project aimed at analyzing the innactivy prediction measured by the number 
 This project uses Logistic Regression and Random Tree classifiers to test the prediction. Seeing as the dataset is highly inbalanced (activity is way higher than innactivity) a few resampling techniques were tested to try the find the best model fit.
 
 The whole project followed the CRISP-DM Data Science method. Check out this post for a detailed explanation.
+https://medium.com/@fernandoguimares/innactivity-prediction-using-machine-learning-on-transacional-data-642ef7c84674
 
 ## 2. Instalation <a name="instalation"></a>
 
