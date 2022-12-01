@@ -21,22 +21,25 @@ This project uses opensource Python libraries: Numpy, Pandas, Matplotlib, SKLear
 ## 3. File descriptions <a name="files"></a>
 
 All datasets were anomyzed by the author using pseudo IDs.
+pseudo SQL querys are presented with dataset specificity omitted due to confidentiallity.
 
 Files used during the exploratory analysis phase:
 
 exploratory analysis.pbix -- Power BI files
+pseudo query - exploratory analysis dataset (anonymous).sql -- SQL Algorithm for creating the accompanying dataset.
 exploratory analysis dataset (anonymous).csv -- Analytical transacional dataset for 981 credit union members
 exporatory analysis - churn flags (anonymous).csv -- Innactivity prediction dataset for 981 credit union members
-
+pseudo query - exporatory analysis - churn flags (anonymous).sql -- SQL Algorithm for creating the accompanying dataset.
+ 
 Files used model development and testing:
 
-pseudo query.sql -- SQL Algorithm for creating the model dataset. Dataset specificity are omitted due to confidentiallity.
+pseudo query.sql-- SQL Algorithm for creating the accompanying dataset.
 Model Data Set (pseudo).csv -- Dataset used for the model
 Innactivity prediction with transactional data.ipynb -- Model development and evaluation python notebook
 
 ## 4. Results <a name="results"></a>
 
-Though the exploratory analysis indicates the possibily of finding correlation between transaction patterns and innactivity, the two classifiers and 4 resampling techniques used did not present good performance on this highly inbalanced dataset.
+Though the exploratory analysis indicates the possibily of finding correlation between transaction patterns and innactivity, the two classifiers and 4 resampling techniques used did not present good performance on this highly imbalanced dataset.
 
 ### Recommendations on future studies
 

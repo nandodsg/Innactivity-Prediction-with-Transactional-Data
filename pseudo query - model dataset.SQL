@@ -348,17 +348,16 @@ from
             when TRANSACTION_CODE in (P,Q,R) then 'Investiments'
             when TRANSACTION_CODE in (M,N,O) then 'Payments'
             else 'N/A' end as PRODUCT -- Product name
-            ,count(ht.OID_HISTORICO) as NUM_TRANSACTIONS -- Counts the number of transactions
+            ,count(1) as NUM_TRANSACTIONS -- Counts the number of transactions
             from MEMBER_TRANSACTIONS
             where 1=1 
             and CHANNEL = 'Mobile App'-- Filter to bring up only Mobile app usage
             and SITUATION = 'Completed' -- Filter to bring only sucefull transactions
             and CREDIT_UNION_ID = 'A'  -- Filter to bring only credit unions of interest
             and INDIVIDUAL_OR_COMPANY = 'Individual' -- Filter to bring only individuals
-            and TIMESTAMP between timestamp '2022-01-01 00:00:00' and timestamp '2022-06-30 23:59:59' -- Filter to bring only transactions in the first semester of 2022
+            and TRANSACTION_DATE between timestamp '2022-01-01 00:00:00' and timestamp '2022-06-30 23:59:59' -- Filter to bring only transactions in the first semester of 2022
             and TRANSACTION_CODE in (...) -- Filter to only bring financial transactions
-            group by 1,2,3,4,5
-           
+            group by 1,2,3,4,5     
             ) base
     ) flg_inner
     group by 1,2,3
