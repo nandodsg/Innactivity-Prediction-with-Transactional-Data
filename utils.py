@@ -16,17 +16,126 @@ from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import precision_recall_curve, accuracy_score, classification_report, confusion_matrix, precision_recall_fscore_support
+from sklearn.metrics import precision_recall_curve, accuracy_score, classification_report, confusion_matrix, roc_auc_score, roc_curve, precision_recall_fscore_support
 # Oversampling and under sampling
 from imblearn.over_sampling import RandomOverSampler, SMOTE
 from imblearn.under_sampling import RandomUnderSampler, NearMiss
 from collections import Counter
 # Processing time
 import time
+# Statistic
+import statistics as s
+# A little try for Reloading Utils when we update
+from importlib import reload  # Python 3.4+ :: Just call the u = u.reload(u) on the main notebook
+import sys 
 
-def model_predict(model_name,resampling_name,X,y,random_state,test_size,verbose):
+def model_run(models,resamplers,X,y,random_state,test_size,verbose,print_report):
     """
-    Trains and Fits Models with different Resampling Techniques
+    
+    INPUT
+    models = Pandas List with model names
+    resamples = Pandas List with resampler names
+    X = DataFrame with independent variables
+    y = Vector with dependent (response) variable
+    random_state = INT random state number
+    verbose = STR to switch execution log on or off
+    print_report = STR to switch result printing on or off
+    
+    OUTPUT
+    """
+    start_time = time.time() #Start processing time counter
+    
+    model_prediction = []
+
+    model_scores_table = pd.DataFrame()
+    model_scores_table['Scores'] = ['Model',
+                                    'Model Name',
+                                    'Resampler Name',
+                                    'TN',
+                                    'FP',
+                                    'FN',
+                                    'TP',
+                                    'Precision 0',
+                                    'Precision 1',
+                                    'Recall 0',
+                                    'Recall 1',
+                                    'F1-Score 0',
+                                    'F1-Score 1',
+                                    'Support 0',
+                                    'Support 1']
+    model_coef_table = pd.DataFrame()
+    model_coef_table['Features'] = X.columns
+
+
+    for model_name in models:
+        for resampler_name in resamplers:
+            
+            #Split and train model
+            model,cr,cm,precision,recall,fbeta_score,support = model_predict(model_name,
+                                                                               resampler_name,
+                                                                               X,
+                                                                               y,
+                                                                               random_state,
+                                                                               test_size,
+                                                                               verbose,
+                                                                               print_report)
+            if verbose != 'off':print(model_name+' '+resampler_name+' Split and Trained ready.')
+            
+            #Predict
+            model_prediction.append((model,model_name,resampler_name))
+
+            if verbose != 'off':print(model_name+' '+resampler_name+' Prediction reay.')
+            
+            #Collect Scores
+            models_scores_append = [model,
+                                    model_name,
+                                    resampler_name,
+                                    cm[0][0],
+                                    cm[0][1],
+                                    cm[1][0],
+                                    cm[1][1],
+                                    precision[0],
+                                    precision[1],
+                                    recall[0],
+                                    recall[1],
+                                    fbeta_score[0],
+                                    fbeta_score[1],
+                                    support[0],
+                                    support[1]]
+
+            model_scores_table[model_name+' '+resampler_name] = models_scores_append
+            if verbose != 'off':print(model_name+' '+resampler_name+' Scores collected.')
+            
+            
+            #Collect Coeficients and Feature Importance
+            if model_name == 'Random Forest': model_coef_table_append = model.feature_importances_
+            elif model_name == 'Logistic Regression': model_coef_table_append = model.coef_[0] 
+
+            model_coef_table[model_name+' '+resampler_name] = model_coef_table_append
+            if verbose != 'off':print(model_name+' '+resampler_name+' Coeficients and Features Importance collected.')
+            
+            #Run Big Blind Test routines:
+            ##################################
+            ##################################
+            ##################################
+            ##################################
+            ##################################
+            ##################################
+            ##################################
+            ##################################
+            ##################################
+            ##################################
+
+    # Let's transpose the Model Scores Table to get a better look
+    model_scores_table_T = transpose_model_scores(model_scores_table)
+
+    print("\nTotal processing time: --- %s seconds ---" % (time.time() - start_time))
+    
+    return model_prediction, model_scores_table_T, model_coef_table
+
+def model_predict(model_name,resampling_name,X,y,random_state,test_size,verbose,print_report):
+    """
+    Trains and Fits Models with different Resampling Techniques, than predicts, scores and measures coeficient and feature importance.
     
     INPUT
     model_name = Str with model name
@@ -35,12 +144,13 @@ def model_predict(model_name,resampling_name,X,y,random_state,test_size,verbose)
     y = Vector with dependent (response) variable
     random_state = INT random state number
     verbose = STR to switch execution log on or off
+    print_report = STR to switch result printing on or off
     
     OUTPUT
     model_prediction = Vector with chosen model with resampling predictions on the test set
     """
     start_time = time.time() #Count processing time
-    print('\n--------------------------------------------------------------------------------\n--------------------------------------------------------------------------------')
+    if verbose != 'off':print('\n--------------------------------------------------------------------------------\n--------------------------------------------------------------------------------')
     if verbose != 'off': print('\nStarting new sequence:',model_name,'with',resampling_name)
     model_prediction = []
     y_train_resampled = []  
@@ -59,9 +169,11 @@ def model_predict(model_name,resampling_name,X,y,random_state,test_size,verbose)
     model_prediction = model.predict(X_test) 
     if verbose != 'off': print("\nModel prediction processing time: --- %s seconds ---" % (time.time() - start_time))
     #Evaluate model performance   
-    cr,cm, precision, recall, fbeta_score, support = model_performance(model_name,resampling_name,y_test,model_prediction,verbose)
+    cr,cm, precision, recall, fbeta_score, support = model_performance(model_name,resampling_name,y_test,model_prediction,verbose,print_report)
     
-    print("\nTotal processing time: --- %s seconds ---" % (time.time() - start_time))
+    if verbose != 'off': print("\nTotal processing time: --- %s seconds ---" % (time.time() - start_time))
+    
+    #pyplot.show()
     
     return model,cr,cm, precision, recall, fbeta_score, support
 
@@ -82,11 +194,17 @@ def define_model(model_name,random_state,verbose):
     start_time = time.time() #Count processing time
     if verbose != 'off': print('\nInstantiating',model_name,'model.')
     rf = RandomForestClassifier(random_state = random_state,
-                                class_weight='balanced'
+                                class_weight='balanced_subsample',
+                                max_depth = 2,
+                                n_estimators=40,
+                                #max_leaf_nodes=5
                                )
     lr =  LogisticRegression(random_state = random_state,
-                             class_weight='balanced',
-                             penalty="l2", tol=0.01, solver="saga"                             
+                             class_weight='balanced_subsample',
+                             penalty="l2", 
+                             tol=0.01,
+                             solver="saga",
+                             C=0.1
                             )
     if model_name == 'Random Forest':
         if verbose != 'off': print('\nModel ready:',rf)
@@ -161,7 +279,7 @@ def split_resample_sets(model_name,resampling_name,X,y,test_size,random_state,ve
 
 
 
-def model_performance(model_name,resampling_name,y_test,model_prediction,verbose):
+def model_performance(model_name,resampling_name,y_test,model_prediction,verbose,print_report):
     """
     Prints the performance reports: Classification report and Confusion Matrix
     
@@ -170,13 +288,8 @@ def model_performance(model_name,resampling_name,y_test,model_prediction,verbose
     resampling_name = Str with resampling method
     y_test = Test vector
     model_prediction = Prediction vector
-    c =
-    cm = 
-    precision = 
-    recall = 
-    fbeta_score =
-    support = INT Number of 
     verbose = STR to switch execution log on or off
+    print_report = STR to switch resulting printing on or off
     
     Returns print with the reports
     """
@@ -184,11 +297,20 @@ def model_performance(model_name,resampling_name,y_test,model_prediction,verbose
     cr = classification_report(y_test, model_prediction)
     cm = confusion_matrix(y_test, model_prediction)
     precision, recall, fbeta_score, support = precision_recall_fscore_support(y_test, model_prediction)
-    print('\n',model_name,'with',resampling_name,' Classification Report:')
-    print(cr)
-    print(cm)
+    if print_report != 'off': print('\n',model_name,'with',resampling_name,' Classification Report:')
+    if print_report != 'off': print(cr)
+    if print_report != 'off': print(cm)
     
     if verbose != 'off': print("\nModel Performane processing time: --- %s seconds ---" % (time.time() - start_time))
+        
+    # Plot the ROC Curve
+    fpr, tpr, thresholds = roc_curve(y_test, model_prediction)
+    pyplot.plot(fpr, tpr,label=model_name+' '+resampling_name)
+    pyplot.title('ROC and AUC Plot for tested models')
+    pyplot.xlabel('False Positive Rate')
+    pyplot.ylabel('True Positive Rate')
+    pyplot.legend()
+    
     return cr,cm, precision, recall, fbeta_score, support
     
     # #Precision-Recall Curve gives us the correct accuracy in this imbalanced dataset case. We can see that we have a very poor accuracy for the model.
@@ -240,8 +362,25 @@ def Model_Coef_Table(models, X):
         
         print(model_)
         
-        if model_name == 'Random Forest': Model_Coef_Table['Coef'+model_name+resampler_name] = model_.feature_importances_
-        elif model_name == 'Logistic Regression': Model_Coef_Table['Coef'+model_name+resampler_name] = model_.coef_[0]    
+        if model_name == 'Random Forest': Model_Coef_Table['Feature Importance '+model_name+resampler_name] = model_.feature_importances_
+        elif model_name == 'Logistic Regression': Model_Coef_Table['Coeficient '+model_name+resampler_name] = model_.coef_[0]    
        
     return Model_Coef_Table
 
+def transpose_model_scores(model_scores_table):
+    """
+    Transposes Model Scores Table for easier analysis
+    
+    INPUT
+    model_scores_table = pd.DataFrame() with model scores
+    
+    OUTPUT
+    model_scores_table_T = pd.DataFrame() of transposed model scores table
+    """
+    # Let's transpose the Model Scores Table to get a better look
+    model_scores_table_T = model_scores_table.T
+    # Now let's promote the first row as header and drop the index
+    model_scores_table_T = model_scores_table_T.rename(columns=model_scores_table_T.iloc[0]).drop(model_scores_table_T.index[0]).reset_index(drop=True)
+    # Let's clean out the score related to predicting the majority class (1) and focus only on the minority
+    #model_scores_table_T = model_scores_table_T.drop(columns=['Precision 1','Recall 1','F1-Score 1'])
+    return model_scores_table_T
