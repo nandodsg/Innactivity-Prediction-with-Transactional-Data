@@ -280,22 +280,22 @@ def define_model(model_name,random_state,verbose):
 
     if model_name == 'Random Forest':
         model = RandomForestClassifier(random_state = random_state,
-                            class_weight='balanced_subsample',
-                            max_depth = 2,
-                            n_estimators=40,
-                            max_leaf_nodes=10
-                           )
+#                                        class_weight='balanced_subsample',
+#                                        max_depth = 2,
+#                                        n_estimators=40,
+#                                        max_leaf_nodes=10
+                                       )
         if verbose != 'off': print('\nModel ready:',model)
         if verbose != 'off': print("Model Instatiating processing time: --- %s seconds ---" % (time.time() - start_time))
 
     elif model_name == 'Logistic Regression':
         model =  LogisticRegression(random_state = random_state,
-                         class_weight='balanced',
-                         penalty="l2", # l1_ratio = 0.5, only necessary with penalty="elasticnet"
-                         tol=0.01,
-                         solver="lbfgs",
-                         C=0.01
-                        )
+#                                      class_weight='balanced',
+#                                      penalty="l2", # l1_ratio = 0.5, only necessary with penalty="elasticnet"
+#                                      tol=0.01,
+#                                      solver="lbfgs",
+#                                      C=0.01
+                                    )
         if verbose != 'off': print('\nModel ready:',lr)
         if verbose != 'off': print("Model Instatiating processing time: --- %s seconds ---" % (time.time() - start_time))
 
@@ -393,7 +393,7 @@ def model_performance(run,model_name,resampling_name,y_test,model_prediction,mod
     Returns print with the reports
     """
     start_time = time.time() #Count processing time
-    cr = classification_report(y_test, model_prediction)
+    cr = classification_report(y_test, model_prediction,zero_division=0)
     cm = confusion_matrix(y_test, model_prediction)
     precision, recall, fbeta_score, support = precision_recall_fscore_support(y_test, model_prediction)
     if print_report != 'off': print('\n',model_name,'with',resampling_name,' Classification Report:')
