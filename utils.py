@@ -29,7 +29,7 @@ import statistics as s
 from importlib import reload  # Python 3.4+ :: Just call the u = u.reload(u) on the main notebook
 import sys 
 
-def model_run(models,resamplers,X,y,random_state,test_size,verbose,print_report):
+def model_run(models,resamplers,X,y,X_bbt,y_bbt,random_state,test_size,verbose,print_report):
     """
     
     INPUT
@@ -43,49 +43,54 @@ def model_run(models,resamplers,X,y,random_state,test_size,verbose,print_report)
     
     OUTPUT
     """
-    start_time = time.time() #Start processing time counter
     
+    start_time = time.time() #Start processing time
+    print('Model training and evaluation routine started.')
+    
+    #Create list to hold firs run's trained models
     model_prediction = []
-
+    
+    #Collect dataframe to collect scores during first run
+    Scores = ['Model',
+            'Model Name',
+            'Resampler Name',
+            'TN',
+            'FP',
+            'FN',
+            'TP',
+            'Precision 0',
+            'Precision 1',
+            'Recall 0',
+            'Recall 1',
+            'F1-Score 0',
+            'F1-Score 1',
+            'Support 0',
+            'Support 1',
+            'FPR',
+            'TPR',
+            'Thresholds']
     model_scores_table = pd.DataFrame()
-    model_scores_table['Scores'] = ['Model',
-                                    'Model Name',
-                                    'Resampler Name',
-                                    'TN',
-                                    'FP',
-                                    'FN',
-                                    'TP',
-                                    'Precision 0',
-                                    'Precision 1',
-                                    'Recall 0',
-                                    'Recall 1',
-                                    'F1-Score 0',
-                                    'F1-Score 1',
-                                    'Support 0',
-                                    'Support 1']
+    model_scores_table['Scores'] = Scores
+    
+    #Create Dataframe to collect first run model's coeficient and feature importance measures
     model_coef_table = pd.DataFrame()
     model_coef_table['Features'] = X.columns
-
-
+        
     for model_name in models:
         for resampler_name in resamplers:
-            
-            #Split and train model
-            model,cr,cm,precision,recall,fbeta_score,support = model_predict(model_name,
-                                                                               resampler_name,
-                                                                               X,
-                                                                               y,
-                                                                               random_state,
-                                                                               test_size,
-                                                                               verbose,
-                                                                               print_report)
-            if verbose != 'off':print(model_name+' '+resampler_name+' Split and Trained ready.')
-            
-            #Predict
-            model_prediction.append((model,model_name,resampler_name))
 
-            if verbose != 'off':print(model_name+' '+resampler_name+' Prediction reay.')
-            
+            #Split, train and predict on models
+            model,cr,cm, precision, recall, fbeta_score, support, fpr, tpr, thresholds =  model_predict(model_name,
+                                                                                                         resampler_name,
+                                                                                                         X,
+                                                                                                         y,
+                                                                                                         random_state,
+                                                                                                         test_size,
+                                                                                                         verbose,
+                                                                                                         print_report)
+            model_prediction.append((model,model_name,resampler_name))
+            if verbose != 'off':print(model_name+' '+resampler_name+' Split, Training and Test Prediction ready.')
+
             #Collect Scores
             models_scores_append = [model,
                                     model_name,
@@ -101,37 +106,102 @@ def model_run(models,resamplers,X,y,random_state,test_size,verbose,print_report)
                                     fbeta_score[0],
                                     fbeta_score[1],
                                     support[0],
-                                    support[1]]
+                                    support[1],
+                                    fpr,
+                                    tpr,
+                                    thresholds]
 
             model_scores_table[model_name+' '+resampler_name] = models_scores_append
             if verbose != 'off':print(model_name+' '+resampler_name+' Scores collected.')
-            
-            
+
+
             #Collect Coeficients and Feature Importance
             if model_name == 'Random Forest': model_coef_table_append = model.feature_importances_
             elif model_name == 'Logistic Regression': model_coef_table_append = model.coef_[0] 
 
             model_coef_table[model_name+' '+resampler_name] = model_coef_table_append
             if verbose != 'off':print(model_name+' '+resampler_name+' Coeficients and Features Importance collected.')
-            
-            #Run Big Blind Test routines:
-            ##################################
-            ##################################
-            ##################################
-            ##################################
-            ##################################
-            ##################################
-            ##################################
-            ##################################
-            ##################################
-            ##################################
-
-    # Let's transpose the Model Scores Table to get a better look
-    model_scores_table_T = transpose_model_scores(model_scores_table)
-
-    print("\nTotal processing time: --- %s seconds ---" % (time.time() - start_time))
+                
+            print('           '+model_name+' '+resampler_name+' routine finished')
     
-    return model_prediction, model_scores_table_T, model_coef_table
+            
+    # Let's transpose the Model Scores Table to get a better look
+    model_scores_table = transpose_model_scores(model_scores_table)
+    
+    print('Model training and evaluation finished.')
+    print('---------------------------------------')
+
+
+    # ---------------------------------------------------------------------------------
+    #Run Big Blind Test routines:
+    print('Starting Big Blind Test routine.')
+    
+    #Create dataframe to collect Big Blind Test performance scores
+    BBT_model_scores_table = pd.DataFrame()
+    BBT_model_scores_table['Scores'] = Scores
+    
+    #Create scaled version of X to use on Logistic Regression Model
+    scaler = StandardScaler().fit(X_bbt)
+    X_bbt_scaled = scaler.transform(X_bbt)
+    X_bbt_scaled
+        
+    for model in model_prediction:
+        BBT_model = model[0]
+        BBT_model_name = model[1]
+        BBT_resampler_name = model[2]
+              
+        #Predict on new Big Blind Test data
+        if BBT_model_name == 'Logistic Regression': 
+            bbt_prediction = model[0].predict(X_bbt_scaled) 
+            bbt_model_proba = model[0].predict_proba(X_bbt_scaled)
+        elif BBT_model_name == 'Random Forest':
+            bbt_prediction = model[0].predict(X_bbt) 
+            bbt_model_proba = model[0].predict_proba(X_bbt)
+        if verbose != 'off':print(BBT_model_name+' '+BBT_resampler_name+' Big Blind Data prediction ready.')
+
+        #Evaluate perfomance of traind models on the new Big Blind Test data 
+        
+        cr,cm, precision, recall, fbeta_score, support, fpr, tpr, thresholds = model_performance('Big Blind Test',
+                                                                                                  BBT_model_name,
+                                                                                                  BBT_resampler_name,
+                                                                                                  y_bbt,
+                                                                                                  bbt_prediction,
+                                                                                                  bbt_model_proba,
+                                                                                                  verbose,
+                                                                                                  print_report)
+        if verbose != 'off':print(model_name+' '+resampler_name+' Big Blind Test Score evaluation finished')
+
+        #Collect Scores
+        BBT_model_scores_table_append = [BBT_model,
+                                         BBT_model_name,
+                                         BBT_resampler_name,
+                                         cm[0][0],
+                                         cm[0][1],
+                                         cm[1][0],
+                                         cm[1][1],
+                                         precision[0],
+                                         precision[1],
+                                         recall[0],
+                                         recall[1],
+                                         fbeta_score[0],
+                                         fbeta_score[1],
+                                         support[0],
+                                         support[1],
+                                         fpr,
+                                         tpr,
+                                         thresholds]
+
+        BBT_model_scores_table[BBT_model_name+' '+BBT_resampler_name] = BBT_model_scores_table_append
+        if verbose != 'off':print(BBT_model_name+' '+BBT_resampler_name+' Big Blind Data Scores collected.')
+            
+        print('           Big Blind Test '+BBT_model_name+' '+BBT_resampler_name+' routine finished')
+        
+    # Let's transpose the BBT Model Scores Table to get a better look
+    BBT_model_scores_table = transpose_model_scores(BBT_model_scores_table)
+
+    print("\nTotal Run processing time: --- %s seconds ---" % (time.time() - start_time))
+    
+    return model_prediction, model_scores_table, model_coef_table, BBT_model_scores_table
 
 def model_predict(model_name,resampling_name,X,y,random_state,test_size,verbose,print_report):
     """
@@ -150,7 +220,7 @@ def model_predict(model_name,resampling_name,X,y,random_state,test_size,verbose,
     model_prediction = Vector with chosen model with resampling predictions on the test set
     """
     start_time = time.time() #Count processing time
-    if verbose != 'off':print('\n--------------------------------------------------------------------------------\n--------------------------------------------------------------------------------')
+    if verbose != 'off':print('\n--------------------------------------------------------------------------------\n')
     if verbose != 'off': print('\nStarting new sequence:',model_name,'with',resampling_name)
     model_prediction = []
     y_train_resampled = []  
@@ -159,7 +229,13 @@ def model_predict(model_name,resampling_name,X,y,random_state,test_size,verbose,
     #Define model
     model = define_model(model_name,random_state,verbose)
     #Split train and test sets + Apply scaling when need + Apply resampling
-    X_train, X_test, y_train, y_test = split_resample_sets(model_name,resampling_name,X,y,test_size,random_state,verbose)
+    X_train, X_test, y_train, y_test = split_resample_sets(model_name,
+                                                           resampling_name,
+                                                           X,
+                                                           y,
+                                                           test_size,
+                                                           random_state,
+                                                           verbose)
     #Train model
     if verbose != 'off': print('\nFitting model.')
     model = model.fit(X_train, y_train)
@@ -169,13 +245,21 @@ def model_predict(model_name,resampling_name,X,y,random_state,test_size,verbose,
     model_prediction = model.predict(X_test) 
     if verbose != 'off': print("\nModel prediction processing time: --- %s seconds ---" % (time.time() - start_time))
     #Evaluate model performance   
-    cr,cm, precision, recall, fbeta_score, support = model_performance(model_name,resampling_name,y_test,model_prediction,verbose,print_report)
+    model_proba = model.predict_proba(X_test)[:, 1]
+    cr,cm, precision, recall, fbeta_score, support, fpr, tpr, thresholds = model_performance('First Run',
+                                                                       model_name,
+                                                                       resampling_name,
+                                                                       y_test,
+                                                                       model_prediction,
+                                                                       model_proba,
+                                                                       verbose,
+                                                                       print_report)
     
-    if verbose != 'off': print("\nTotal processing time: --- %s seconds ---" % (time.time() - start_time))
+    if verbose != 'off': print("\nTotal Model processing time: --- %s seconds ---" % (time.time() - start_time))
     
     #pyplot.show()
     
-    return model,cr,cm, precision, recall, fbeta_score, support
+    return model,cr,cm, precision, recall, fbeta_score, support, fpr, tpr, thresholds
 
 
 
@@ -193,32 +277,32 @@ def define_model(model_name,random_state,verbose):
     """
     start_time = time.time() #Count processing time
     if verbose != 'off': print('\nInstantiating',model_name,'model.')
-    rf = RandomForestClassifier(random_state = random_state,
-                                class_weight='balanced_subsample',
-                                max_depth = 2,
-                                n_estimators=40,
-                                #max_leaf_nodes=5
-                               )
-    lr =  LogisticRegression(random_state = random_state,
-                             class_weight='balanced_subsample',
-                             penalty="l2", 
-                             tol=0.01,
-                             solver="saga",
-                             C=0.1
-                            )
+
     if model_name == 'Random Forest':
-        if verbose != 'off': print('\nModel ready:',rf)
+        model = RandomForestClassifier(random_state = random_state,
+                            class_weight='balanced_subsample',
+                            max_depth = 2,
+                            n_estimators=40,
+                            max_leaf_nodes=10
+                           )
+        if verbose != 'off': print('\nModel ready:',model)
         if verbose != 'off': print("Model Instatiating processing time: --- %s seconds ---" % (time.time() - start_time))
-        return rf
+
     elif model_name == 'Logistic Regression':
+        model =  LogisticRegression(random_state = random_state,
+                         class_weight='balanced',
+                         penalty="l2", # l1_ratio = 0.5, only necessary with penalty="elasticnet"
+                         tol=0.01,
+                         solver="lbfgs",
+                         C=0.01
+                        )
         if verbose != 'off': print('\nModel ready:',lr)
         if verbose != 'off': print("Model Instatiating processing time: --- %s seconds ---" % (time.time() - start_time))
-        return lr
+
     else:
         print('\nNo compatible model.')
 
-
-    
+    return model    
     
 def split_resample_sets(model_name,resampling_name,X,y,test_size,random_state,verbose):
     """
@@ -240,6 +324,7 @@ def split_resample_sets(model_name,resampling_name,X,y,test_size,random_state,ve
     y_test = Vector with dependent variable splitted for test set
     """
     start_time = time.time() #Count processing time
+    
     if verbose != 'off': print('\nIniatialing split for train and test sets. \nAnalyzing need for variable rescaling.')
     if model_name == 'Logistic Regression':
         if verbose != 'off': print('\nLogistic Regression requies scaling. \nVariable rescaling necessary.')
@@ -248,42 +333,56 @@ def split_resample_sets(model_name,resampling_name,X,y,test_size,random_state,ve
         X_scaled
 
         # Split into train and test
-        X_train, X_test, y_train, y_test = train_test_split(X_scaled, y,test_size = test_size, random_state = random_state)
+        X_train, X_test, y_train, y_test = train_test_split(X_scaled, 
+                                                            y,test_size = test_size,
+                                                            random_state = random_state)
     elif model_name == 'Random Forest':
+        
         if verbose != 'off': print('\nRandom Forest does not require rescalling.')
         # Split into train and test
-        X_train, X_test, y_train, y_test = train_test_split(X, y,test_size = test_size, random_state = random_state)
+        X_train, X_test, y_train, y_test = train_test_split(X,
+                                                            y,
+                                                            test_size = test_size,
+                                                            random_state = random_state)
+    
     
     if verbose != 'off': print('\nApplying resampling technique choosen.')
+    
     if resampling_name == 'Baseline':
         if verbose != 'off': print("\nBaseline doesn't require resampling.")
+    
     elif resampling_name == 'Random Over Sampling':
         if verbose != 'off': print('\nApplying',resampling_name)
         resampler = RandomOverSampler(random_state=random_state)
         X_train, y_train= resampler.fit_resample(X_train, y_train)
+    
     elif resampling_name == 'SMOTE':
         if verbose != 'off': print('\nApplying',resampling_name)
         resampler = SMOTE(random_state=random_state)
         X_train, y_train= resampler.fit_resample(X_train, y_train)
+    
     elif resampling_name == 'NearMiss KNN':
         if verbose != 'off': print('\nApplying',resampling_name)
         resampler = NearMiss(version=3,random_state=random_state)
         X_train, y_train= resampler.fit_resample(X_train, y_train)
+    
     elif resampling_name == 'Random Under Sampling':
         if verbose != 'off': print('\nApplying',resampling_name)
         resampler = RandomUnderSampler(random_state=random_state)
         X_train, y_train= resampler.fit_resample(X_train, y_train)
     
     if verbose != 'off': print("\nResampling processing time: --- %s seconds ---" % (time.time() - start_time))
+        
     return X_train, X_test, y_train, y_test
 
 
 
-def model_performance(model_name,resampling_name,y_test,model_prediction,verbose,print_report):
+def model_performance(run,model_name,resampling_name,y_test,model_prediction,model_proba,verbose,print_report):
     """
     Prints the performance reports: Classification report and Confusion Matrix
     
     Inputs
+    run = Str indicating which run is being executed. Accepts only 'First Run' and 'Big Blind Test'
     model_name = Str with model name
     resampling_name = Str with resampling method
     y_test = Test vector
@@ -303,29 +402,24 @@ def model_performance(model_name,resampling_name,y_test,model_prediction,verbose
     
     if verbose != 'off': print("\nModel Performane processing time: --- %s seconds ---" % (time.time() - start_time))
         
-    # Plot the ROC Curve
-    fpr, tpr, thresholds = roc_curve(y_test, model_prediction)
-    pyplot.plot(fpr, tpr,label=model_name+' '+resampling_name)
+    # Plot the ROC Curve    
+    #Implementation derived from :
+    ## https://scikit-learn.org/stable/modules/model_evaluation.html#roc-metrics
+    ## https://stackoverflow.com/questions/33208897/how-to-interpret-this-triangular-shape-roc-auc-curve
+      
+    if run == 'First Run':
+        fpr, tpr, thresholds = roc_curve(y_test, model_proba)
+        pyplot.plot(fpr, tpr,label=run+' '+model_name+' '+resampling_name)
+    elif run == 'Big Blind Test':
+        fpr, tpr, thresholds = roc_curve(y_test, model_proba[:, 1])
+        pyplot.plot(fpr, tpr,label=run+' '+model_name+' '+resampling_name,linestyle='--')
     pyplot.title('ROC and AUC Plot for tested models')
     pyplot.xlabel('False Positive Rate')
     pyplot.ylabel('True Positive Rate')
-    pyplot.legend()
+    pyplot.legend(bbox_to_anchor=(1,1), loc="upper left")
     
-    return cr,cm, precision, recall, fbeta_score, support
+    return cr,cm, precision, recall, fbeta_score, support, fpr, tpr, thresholds
     
-    # #Precision-Recall Curve gives us the correct accuracy in this imbalanced dataset case. We can see that we have a very poor accuracy for the model.
-    # precision, recall, thresholds = precision_recall_curve(model_prediction, y_test)
-
-    # # create plot
-    # plt.plot(precision, recall, label='Precision-recall curve')
-    # plt.xlabel('Precision')
-    # plt.ylabel('Recall')
-    # plt.title('Precision-recall curve')
-    # plt.legend(loc="lower left")
-
-
-        
-
 
 def Model_Coef_Table(models, X):
     """
